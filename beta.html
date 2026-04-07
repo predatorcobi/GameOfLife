@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conway Ultra • God Mode Ecosystem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
+        
+        :root { --tw-color-primary: #00ff88; }
+        body { font-family: 'Inter', system_ui, sans-serif; background-color: #050505; color: white; overflow: hidden; }
+        .title-font { font-family: 'Space Grotesk', sans-serif; }
+
+        canvas {
+            image-rendering: pixelated;
+            box-shadow: 0 0 50px -15px rgba(0, 255, 136, 0.3);
+            border: 2px solid #00ff88;
+            cursor: crosshair;
+            background-color: #0a0a0a;
+        }
+
+        .control-btn { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .control-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 15px -3px rgba(0, 255, 136, 0.4); }
+        .neon-text { text-shadow: 0 0 10px #00ff88; }
+        
+        input[type="range"] { accent-color: #00ff88; }
+        .sidebar { background: rgba(15, 15, 15, 0.95); border-right: 1px solid rgba(0, 255, 136, 0.2); }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <div class="h-16 border-b border-[#00ff88]/20 bg-black flex items-center justify-between px-6 z-10">
+        <div class="flex items-center gap-4">
+            <h1 class="title-font text-2xl neon-text font-bold tracking-tighter text-[#00ff88]">ULTRA LIFE</h1>
+            <div class="px-3 py-1 bg-zinc-900 rounded-full text-[10px] font-mono border border-[#00ff88]/30 text-[#00ff88]">
+                TOROIDAL WORLD • GEN <span id="gen-top">0</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-6">
+            <div id="zoom-info" class="text-xs font-mono text-zinc-400">🔎 Zoom: <span id="zoom-val" class="text-[#00ff88]">1.00x</span></div>
+            <button onclick="resetView()" class="text-xs hover:text-[#00ff88] transition-colors">RESET VIEW</button>
+        </div>
+    </div>
+
+    <div class="flex flex-1 overflow-hidden">
+        <div class="w-80 sidebar flex flex-col p-6 gap-6 overflow-y-auto">
+            
+            <div class="flex gap-2">
+                <button onclick="toggleSimulation()" id="play-btn" class="flex-1 py-4 rounded-2xl bg-[#00ff88] text-black font-bold flex items-center justify-center gap-2 control-btn">
+                    <span id="play-icon">▶️</span> <span id="play-text">Spustit</span>
+                </button>
+                <button onclick="stepOnce()" class="px-4 bg-zinc-800 rounded-2xl hover:bg-zinc-700 transition-colors text-xl">⏭</button>
+            </div>
+            <p class="text-[10px] text-center text-zinc-500 -mt-4">Tip: Mezerník pro pauzu</p>
+
+            <div>
+                <div class="flex justify-between text-xs mb-2 uppercase tracking-widest text-zinc-400">
+                    <span>Rychlost</span> <span id="speed-display" class="text-[#00ff88]">40ms</span>
+                </div>
+                <input type="range" id="speed-slider" min="1" max="200" value="40" class="w-full" oninput="updateSpeed(this.value)">
+            </div>
+
+            <div>
+                <h3 class="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-widest">💾 Knihovna vzorů</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="setPattern('glider')" class="p-2 bg-zinc-800 hover:bg-[#00ff88] hover:text-black rounded-lg text-[11px] transition-all">🚀 Glider</button>
+                    <button onclick="setPattern('pulsar')" class="p-2 bg-zinc-800 hover:bg-[#00ff88] hover:text-black rounded-lg text-[11px] transition-all">💠 Pulsar</button>
+                    <button onclick="setPattern('gosper')" class="p-2 bg-zinc-800 hover:bg-[#00ff88] hover:text-black rounded-lg text-[11px] transition-all">🔫 Gosper Gun</button>
+                    <button onclick="setPattern('heavy')" class="p-2 bg-zinc-800 hover:bg-[#00ff88] hover:text-black rounded-lg text-[11px] transition-all">🚢 Heavy Ship</button>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-widest">🖌️ Výběr druhu</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="setBrush(1)" id="b-1" class="p-3 bg-zinc-900 border-2 border-transparent rounded-xl text-xs text-left">🌱 Rostlina</button>
+                    <button onclick="setBrush(2)" id="b-2" class="p-3 bg-zinc-900 border-2 border-[#00ff88] rounded-xl text-xs text-left">🐛 Kořist</button>
+                    <button onclick="setBrush(3)" id="b-3" class="p-3 bg-zinc-900 border-2 border-transparent rounded-xl text-xs text-left">🦅 Dravec</button>
+                    <button onclick="setBrush(0)" id="b-0" class="p-3 bg-zinc-900 border-2 border-transparent rounded-xl text-xs text-left">🗑️ Smazat</button>
+                </div>
+            </div>
+
+            <div class="mt-auto p-4 bg-black/40 rounded-2xl border border-white/5 font-mono text-[11px]">
+                <div class="flex justify-between mb-1"><span>🌱 Rostliny:</span><span id="stat-1" class="text-emerald-400">0</span></div>
+                <div class="flex justify-between mb-1"><span>🐛 Kořist:</span><span id="stat-2" class="text-blue-400">0</span></div>
+                <div class="flex justify-between"><span>🦅 Dravci:</span><span id="stat-3" class="text-red-400">0</span></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="randomize()" class="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-[11px] font-bold">🎲 RANDOM</button>
+                <button onclick="clearGrid()" class="p-3 bg-zinc-800 hover:bg-red-900/30 rounded-xl text-[11px] font-bold">🧹 CLEAR</button>
+            </div>
+        </div>
+
+        <div class="flex-1 bg-[#050505] relative flex items-center justify-center p-4">
+            <canvas id="canvas"></canvas>
+        </div>
+    </div>
+
+<script>
+    // Konfigurace
+    const COLS = 200, ROWS = 150, BASE_CELL_SIZE = 4;
+    let canvas, ctx;
+    let speciesGrid = [], energyGrid = [];
+    
+    // Stav aplikace
+    let running = false;
+    let generation = 0;
+    let speed = 40;
+    let lastTick = 0;
+    let currentBrush = 2;
+    let selectedPattern = null;
+
+    // Viewport (Zoom/Pan)
+    let zoomLevel = 1.0;
+    let panX = 0;
+    let panY = 0;
+    let isPanning = false;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+
+    // Barvy
+    const COLORS = { 1: '#22cc55', 2: '#4488ff', 3: '#ff3366' };
+
+    // Knihovna vzorů
+    const PATTERNS = {
+        glider: [[0,1], [1,2], [2,0], [2,1], [2,2]],
+        pulsar: [[2,4],[2,5],[2,6],[7,4],[7,5],[7,6],[9,4],[9,5],[9,6],[14,4],[14,5],[14,6],[4,2],[5,2],[6,2],[10,2],[11,2],[12,2],[4,7],[5,7],[6,7],[10,7],[11,7],[12,7],[4,9],[5,9],[6,9],[10,9],[11,9],[12,9],[4,14],[5,14],[6,14],[10,14],[11,14],[12,14]],
+        gosper: [[1,5],[2,5],[1,6],[2,6],[11,5],[11,6],[11,7],[12,4],[12,8],[13,3],[13,9],[14,3],[14,9],[15,6],[16,4],[16,8],[17,5],[17,6],[17,7],[18,6],[21,3],[21,4],[21,5],[22,3],[22,4],[22,5],[23,2],[23,6],[25,1],[25,2],[25,6],[25,7],[35,3],[35,4],[36,3],[36,4]],
+        heavy: [[1,0],[2,0],[3,0],[4,0],[5,0],[0,1],[6,1],[0,2],[6,3],[1,4],[3,4]]
+    };
+
+    function init() {
+        canvas = document.getElementById('canvas');
+        ctx = canvas.getContext('2d', { alpha: false });
+
+        // Inicializace mřížek
+        for (let y = 0; y < ROWS; y++) {
+            speciesGrid[y] = new Array(COLS).fill(0);
+            energyGrid[y] = new Array(COLS).fill(0);
+        }
+
+        // Fix pro display velikost
+        window.addEventListener('resize', resizeCanvasDisplay);
+        resizeCanvasDisplay();
+
+        // Ovládání
+        canvas.addEventListener('mousedown', handleMouseDown);
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+        window.addEventListener('keydown', e => {
+            if (e.code === 'Space') { e.preventDefault(); toggleSimulation(); }
+        });
+
+        randomize();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function resizeCanvasDisplay() {
+        const rect = canvas.parentNode.getBoundingClientRect();
+        canvas.width = rect.width - 40;
+        canvas.height = rect.height - 40;
+        draw();
+    }
+
+    function getGridPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        let mx = (e.clientX - rect.left) * scaleX;
+        let my = (e.clientY - rect.top) * scaleY;
+        mx = (mx - panX) / zoomLevel;
+        my = (my - panY) / zoomLevel;
+        return { x: Math.floor(mx / BASE_CELL_SIZE), y: Math.floor(my / BASE_CELL_SIZE) };
+    }
+
+    function handleMouseDown(e) {
+        if (e.button === 2) { 
+            isPanning = true; 
+            lastMouseX = e.clientX; 
+            lastMouseY = e.clientY; 
+            return; 
+        }
+        
+        const pos = getGridPos(e);
+        if (selectedPattern) {
+            spawnPattern(pos.x, pos.y, selectedPattern);
+            selectedPattern = null;
+            document.body.style.cursor = 'crosshair';
+        } else {
+            isPainting = true;
+            paint(e);
+        }
+    }
+
+    function handleMouseMove(e) {
+        if (isPanning) {
+            panX += (e.clientX - lastMouseX);
+            panY += (e.clientY - lastMouseY);
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+            draw();
+            return;
+        }
+        if (isPainting) paint(e);
+    }
+
+    function handleMouseUp() { isPainting = false; isPanning = false; }
+
+    function paint(e) {
+        const pos = getGridPos(e);
+        if (pos.x >= 0 && pos.x < COLS && pos.y >= 0 && pos.y < ROWS) {
+            speciesGrid[pos.y][pos.x] = currentBrush;
+            energyGrid[pos.y][pos.x] = currentBrush > 0 ? 100 : 0;
+            draw();
+        }
+    }
+
+    function handleWheel(e) {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+        
+        const oldZoom = zoomLevel;
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        zoomLevel = Math.max(0.4, Math.min(zoomLevel * factor, 20));
+        
+        panX = mx - (mx - panX) * (zoomLevel / oldZoom);
+        panY = my - (my - panY) * (zoomLevel / oldZoom);
+        
+        document.getElementById('zoom-val').textContent = zoomLevel.toFixed(2) + 'x';
+        draw();
+    }
+
+    function spawnPattern(startX, startY, patternKey) {
+        const pts = PATTERNS[patternKey];
+        pts.forEach(([dx, dy]) => {
+            const nx = (startX + dx + COLS) % COLS;
+            const ny = (startY + dy + ROWS) % ROWS;
+            speciesGrid[ny][nx] = currentBrush || 2;
+            energyGrid[ny][nx] = 100;
+        });
+        updateStats();
+    }
+
+    function toggleSimulation() {
+        running = !running;
+        const btn = document.getElementById('play-btn');
+        document.getElementById('play-icon').textContent = running ? '❚❚' : '▶️';
+        document.getElementById('play-text').textContent = running ? 'Pauza' : 'Spustit';
+        btn.style.backgroundColor = running ? '#f59e0b' : '#00ff88';
+    }
+
+    function updateSpeed(v) {
+        speed = v;
+        document.getElementById('speed-display').textContent = v + 'ms';
+    }
+
+    function setBrush(b) {
+        currentBrush = b;
+        document.querySelectorAll('[id^="b-"]').forEach(el => el.style.borderColor = 'transparent');
+        document.getElementById('b-' + b).style.borderColor = '#00ff88';
+    }
+
+    function setPattern(key) {
+        selectedPattern = key;
+        document.body.style.cursor = 'copy';
+    }
+
+    function countSpecies(type) {
+        let count = 0;
+        for (let y = 0; y < ROWS; y++) {
+            for (let x = 0; x < COLS; x++) {
+                if (speciesGrid[y][x] === type) count++;
+            }
+        }
+        return count;
+    }
+
+    function updateStats() {
+        document.getElementById('gen-top').textContent = generation;
+        document.getElementById('stat-1').textContent = countSpecies(1);
+        document.getElementById('stat-2').textContent = countSpecies(2);
+        document.getElementById('stat-3').textContent = countSpecies(3);
+    }
+
+    function simulate() {
+        const nextSpecies = speciesGrid.map(r => [...r]);
+        const nextEnergy = energyGrid.map(r => [...r]);
+        
+        for (let y = 0; y < ROWS; y++) {
+            for (let x = 0; x < COLS; x++) {
+                let neighbors = { 1:0, 2:0, 3:0, total: 0 };
+                
+                // Toroidní sousedé
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const ny = (y + dy + ROWS) % ROWS;
+                        const nx = (x + dx + COLS) % COLS;
+                        const ns = speciesGrid[ny][nx];
+                        if (ns > 0) {
+                            neighbors[ns]++;
+                            neighbors.total++;
+                        }
+                    }
+                }
+
+                const s = speciesGrid[y][x];
+                
+                if (s === 1) { // Rostlina
+                    nextEnergy[y][x] = Math.min(100, energyGrid[y][x] + 2);
+                    if (neighbors[2] > 0 || neighbors.total > 7) nextSpecies[y][x] = 0;
+                } 
+                else if (s === 2) { // Kořist
+                    let e = energyGrid[y][x] - 4 + (neighbors[1] * 15);
+                    if (e <= 0 || neighbors[2] > 5 || neighbors[3] > 0) nextSpecies[y][x] = 0;
+                    else nextEnergy[y][x] = e;
+                } 
+                else if (s === 3) { // Dravec
+                    let e = energyGrid[y][x] - 6 + (neighbors[2] * 25);
+                    if (e <= 0 || neighbors[3] > 4) nextSpecies[y][x] = 0;
+                    else nextEnergy[y][x] = e;
+                } 
+                else { // Prázdno -> Birth
+                    if (neighbors[2] === 3) { nextSpecies[y][x] = 2; nextEnergy[y][x] = 70; }
+                    else if (neighbors[3] === 3 && neighbors[2] > 0) { nextSpecies[y][x] = 3; nextEnergy[y][x] = 60; }
+                    else if (neighbors[1] > 3 && Math.random() < 0.01) { nextSpecies[y][x] = 1; nextEnergy[y][x] = 100; }
+                }
+            }
+        }
+        speciesGrid = nextSpecies;
+        energyGrid = nextEnergy;
+        generation++;
+        updateStats();
+    }
+
+    function draw() {
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.save();
+        ctx.translate(panX, panY);
+        ctx.scale(zoomLevel, zoomLevel);
+
+        for (let y = 0; y < ROWS; y++) {
+            for (let x = 0; x < COLS; x++) {
+                const s = speciesGrid[y][x];
+                if (s > 0) {
+                    ctx.fillStyle = COLORS[s];
+                    // Vizuální indikátor energie (průhlednost)
+                    ctx.globalAlpha = 0.4 + (energyGrid[y][x] / 160);
+                    ctx.fillRect(x * BASE_CELL_SIZE, y * BASE_CELL_SIZE, BASE_CELL_SIZE - 0.5, BASE_CELL_SIZE - 0.5);
+                }
+            }
+        }
+        ctx.restore();
+    }
+
+    function gameLoop(timestamp) {
+        if (running && timestamp - lastTick >= speed) {
+            simulate();
+            lastTick = timestamp;
+        }
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function stepOnce() { simulate(); draw(); }
+    function resetView() { zoomLevel = 1; panX = 0; panY = 0; document.getElementById('zoom-val').textContent = '1.00x'; draw(); }
+    function clearGrid() { 
+        speciesGrid = speciesGrid.map(r => r.fill(0)); 
+        energyGrid = energyGrid.map(r => r.fill(0));
+        generation = 0; updateStats(); draw(); 
+    }
+    
+    function randomize() {
+        for(let y=0; y<ROWS; y++) {
+            for(let x=0; x<COLS; x++) {
+                const r = Math.random();
+                if(r > 0.98) { speciesGrid[y][x]=3; energyGrid[y][x]=60; }
+                else if(r > 0.92) { speciesGrid[y][x]=2; energyGrid[y][x]=70; }
+                else if(r > 0.88) { speciesGrid[y][x]=1; energyGrid[y][x]=100; }
+                else { speciesGrid[y][x]=0; }
+            }
+        }
+        updateStats(); draw();
+    }
+
+    // Start
+    init();
+</script>
+</body>
+</html>
