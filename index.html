@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CobiLife • Bio-Sim</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
+        :root { --neon: #00ff88; --hazard: #ffaa00; --virus: #bc13fe; }
+        body { font-family: 'Space Grotesk', sans-serif; background: #050505; color: white; overflow: hidden; touch-action: none; }
+        canvas { image-rendering: pixelated; background-color: #080808; cursor: crosshair; outline: none; }
+        .glass { background: rgba(10, 10, 10, 0.9); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .active-tool { border-color: var(--neon) !important; box-shadow: 0 0 15px rgba(0, 255, 136, 0.4); background: rgba(0, 255, 136, 0.1) !important; }
+        .active-event { border-color: var(--hazard) !important; box-shadow: 0 0 15px rgba(255, 170, 0, 0.4); background: rgba(255, 170, 0, 0.1) !important; }
+        input[type="range"] { accent-color: var(--neon); cursor: pointer; }
+    </style>
+</head>
+<body class="h-screen flex flex-col md:flex-row">
+
+    <div class="w-full md:w-80 glass border-b md:border-r border-white/10 p-5 flex flex-col gap-4 z-20 overflow-y-auto">
+        <div class="flex items-center justify-between">
+            <h1 class="text-xl font-bold tracking-tighter text-[#00ff88]">COBI LIFE</h1>
+            <span class="text-[10px] font-mono py-1 px-2 bg-white/5 rounded border border-white/10 text-zinc-400">v2.2</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+            <button onclick="toggleSimulation()" id="play-btn" class="py-3 rounded-xl bg-[#00ff88] text-black font-bold flex items-center justify-center gap-2 active:scale-95 transition-all">
+                <span id="play-icon">▶</span> <span id="play-text">Start</span>
+            </button>
+            <button onclick="stepOnce()" class="bg-white/5 hover:bg-white/10 rounded-xl text-xl">⏭</button>
+        </div>
+
+        <div class="space-y-4">
+            <div>
+                <div class="flex justify-between text-[10px] uppercase text-zinc-500 mb-1">
+                    <span>Engine Speed</span> <span id="speed-display" class="text-[#00ff88]">1x</span>
+                </div>
+                <input type="range" id="speed-slider" min="1" max="250" value="100" class="w-full" oninput="updateSpeed(this.value)">
+            </div>
+            <div>
+                <div class="flex justify-between text-[10px] uppercase text-zinc-500 mb-1">
+                    <span>Mutation Chance</span> <span id="mut-display" class="text-[#00ff88]">1%</span>
+                </div>
+                <input type="range" id="mut-slider" min="0" max="100" value="1" class="w-full" oninput="updateMutation(this.value)">
+            </div>
+        </div>
+
+        <hr class="border-white/5">
+
+        <div>
+            <h3 class="text-[10px] font-bold text-zinc-500 mb-2 uppercase tracking-widest">Biological Brush</h3>
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="setBrush(1)" id="b-1" class="p-2 bg-white/5 border border-transparent rounded-lg text-xs text-left">🌱 Plant</button>
+                <button onclick="setBrush(2)" id="b-2" class="p-2 bg-white/5 border border-transparent rounded-lg text-xs text-left active-tool">🐛 Prey</button>
+                <button onclick="setBrush(3)" id="b-3" class="p-2 bg-white/5 border border-transparent rounded-lg text-xs text-left">🦅 Predator</button>
+                <button onclick="setBrush(0)" id="b-0" class="p-2 bg-white/5 border border-transparent rounded-lg text-xs text-left">🧹 Eraser</button>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-[10px] font-bold text-orange-500 mb-2 uppercase tracking-widest">Global Events</h3>
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="setEvent('meteor')" id="e-meteor" class="p-2 bg-white/5 border border-transparent rounded-lg text-xs text-left">☄️ Meteorite</button>
+                <button onclick="setEvent('virus')" id="e-virus" class="p-2 bg-white/5 border border-transparent rounded-lg text-xs text-left">🧬 Virus</button>
+            </div>
+        </div>
+
+        <div class="p-4 bg-black/40 rounded-xl border border-white/5 font-mono text-[11px] space-y-1 mt-2">
+            <div class="flex justify-between"><span>GEN:</span><span id="gen-top" class="text-white">0</span></div>
+            <div class="flex justify-between"><span>🌱 PLANTS:</span><span id="stat-1" class="text-emerald-400">0</span></div>
+            <div class="flex justify-between"><span>🐛 PREY:</span><span id="stat-2" class="text-blue-400">0</span></div>
+            <div class="flex justify-between"><span>🦅 PREDATORS:</span><span id="stat-3" class="text-red-400">0</span></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 mt-auto">
+            <button onclick="randomize()" class="p-2 bg-zinc-800 rounded-lg text-[10px] font-bold hover:bg-zinc-700">🎲 RANDOM</button>
+            <button onclick="clearGrid()" class="p-2 bg-zinc-800 rounded-lg text-[10px] font-bold hover:bg-red-900/20">🗑️ CLEAR</button>
+        </div>
+    </div>
+
+    <div class="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+        <canvas id="canvas" tabindex="1"></canvas>
+    </div>
+
+<script>
+    const COLS = 160, ROWS = 100, CELL_SIZE = 6;
+    let gridA = new Int8Array(COLS * ROWS), gridB = new Int8Array(COLS * ROWS);
+    let energyA = new Int8Array(COLS * ROWS), energyB = new Int8Array(COLS * ROWS);
+    let eventGrid = new Int8Array(COLS * ROWS); // 99=Virus, 10-6=Lava, 5-1=Stone
+    let immunityGrid = new Int8Array(COLS * ROWS);
+    let projectiles = []; // For meteorite animations
+
+    let currentGrid = gridA, nextGrid = gridB;
+    let currentEnergy = energyA, nextEnergy = energyB;
+
+    let canvas, ctx;
+    let running = false, generation = 0;
+    let delay = 30, ticksPerFrame = 1;
+    let lastTick = 0, currentBrush = 2, activeEvent = null, mutationChance = 0.01;
+    let zoom = 1.0, panX = 0, panY = 0;
+    let isPanning = false, isDrawing = false, lastX = 0, lastY = 0;
+
+    const COLORS = { 
+        1: '#22cc55', 2: '#4488ff', 3: '#ff3366', 
+        virus: '#bc13fe', lava: '#ff6600', stone: '#555555' 
+    };
+
+    function init() {
+        canvas = document.getElementById('canvas');
+        ctx = canvas.getContext('2d', { alpha: false });
+        resize();
+        window.addEventListener('resize', resize);
+        
+        canvas.addEventListener('mousedown', e => {
+            if (e.button === 0) {
+                if (activeEvent) triggerEvent(e);
+                else isDrawing = true;
+            }
+            if (e.button === 1) { e.preventDefault(); isPanning = true; }
+            lastX = e.clientX; lastY = e.clientY;
+            if (isDrawing) paint(e);
+        });
+
+        window.addEventListener('mousemove', e => {
+            if (isPanning) {
+                panX += (e.clientX - lastX); panY += (e.clientY - lastY);
+                lastX = e.clientX; lastY = e.clientY;
+            } else if (isDrawing) paint(e);
+        });
+
+        window.addEventListener('mouseup', () => { isDrawing = false; isPanning = false; });
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        
+        updateSpeed(100);
+        randomize();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function resize() {
+        canvas.width = canvas.parentNode.clientWidth;
+        canvas.height = canvas.parentNode.clientHeight;
+    }
+
+    function getGridCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.floor(((e.clientX - rect.left) - panX) / (zoom * CELL_SIZE));
+        const y = Math.floor(((e.clientY - rect.top) - panY) / (zoom * CELL_SIZE));
+        return {x, y};
+    }
+
+    function paint(e) {
+        const coords = getGridCoords(e);
+        if (coords.x >= 0 && coords.x < COLS && coords.y >= 0 && coords.y < ROWS) {
+            const idx = coords.y * COLS + coords.x;
+            currentGrid[idx] = currentBrush;
+            currentEnergy[idx] = currentBrush > 0 ? 100 : 0;
+            if (currentBrush > 0) {
+                immunityGrid[idx] = 0;
+                eventGrid[idx] = 0; // Eraser/Brush clears stone/lava
+            }
+        }
+    }
+
+    function setBrush(b) {
+        currentBrush = b; activeEvent = null;
+        document.querySelectorAll('[id^="b-"], [id^="e-"]').forEach(el => el.classList.remove('active-tool', 'active-event'));
+        document.getElementById('b-' + b).classList.add('active-tool');
+    }
+
+    function setEvent(type) {
+        activeEvent = type;
+        document.querySelectorAll('[id^="b-"], [id^="e-"]').forEach(el => el.classList.remove('active-tool', 'active-event'));
+        document.getElementById('e-' + type).classList.add('active-event');
+    }
+
+    function triggerEvent(e) {
+        const coords = getGridCoords(e);
+        if (coords.x < 0 || coords.x >= COLS || coords.y < 0 || coords.y >= ROWS) return;
+
+        if (activeEvent === 'meteor') {
+            // Start animation from top-leftish sky
+            projectiles.push({
+                startX: coords.x * CELL_SIZE - 200,
+                startY: coords.y * CELL_SIZE - 400,
+                targetX: coords.x,
+                targetY: coords.y,
+                progress: 0,
+                speed: 0.04
+            });
+        } else if (activeEvent === 'virus') {
+            const idx = coords.y * COLS + coords.x;
+            if (currentGrid[idx] > 0) eventGrid[idx] = 99;
+        }
+    }
+
+    function createExplosion(tx, ty) {
+        const radius = 10;
+        for(let dy=-radius; dy<=radius; dy++) {
+            for(let dx=-radius; dx<=radius; dx++) {
+                if(dx*dx + dy*dy <= radius*radius) {
+                    const nx = (tx + dx + COLS) % COLS;
+                    const ny = (ty + dy + ROWS) % ROWS;
+                    const i = ny * COLS + nx;
+                    eventGrid[i] = 12; // Start as Lava (12 down to 6)
+                    currentGrid[i] = 0; // Kill life instantly
+                }
+            }
+        }
+    }
+
+    function simulate() {
+        for (let i = 0; i < COLS * ROWS; i++) {
+            nextGrid[i] = 0; nextEnergy[i] = 0;
+            if (immunityGrid[i] > 0) immunityGrid[i]--;
+        }
+
+        for (let y = 0; y < ROWS; y++) {
+            for (let x = 0; x < COLS; x++) {
+                const i = y * COLS + x;
+                const ev = eventGrid[i];
+                
+                // Handle Lava/Stone Aging
+                if (ev > 0 && ev < 90) {
+                    if (generation % 3 === 0) eventGrid[i]--; 
+                    // If it's lava (above 5) or stone (1-5), it blocks life
+                    if (eventGrid[i] > 0) continue; 
+                }
+
+                const s = currentGrid[i];
+                const e = currentEnergy[i];
+                const isSick = ev === 99;
+
+                let n1 = 0, n2 = 0, n3 = 0, sickNeighbors = 0;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const nx = (x + dx + COLS) % COLS;
+                        const ny = (y + dy + ROWS) % ROWS;
+                        const ni = ny * COLS + nx;
+                        const ns = currentGrid[ni];
+                        if (ns === 1) n1++; else if (ns === 2) n2++; else if (ns === 3) n3++;
+                        if (eventGrid[ni] === 99) sickNeighbors++;
+                    }
+                }
+
+                if (!isSick && s > 0 && sickNeighbors > 0 && immunityGrid[i] === 0) {
+                    if (Math.random() < 0.4) eventGrid[i] = 99;
+                }
+
+                if (isSick) {
+                    if (Math.random() < 0.3) {
+                        eventGrid[i] = 0; nextGrid[i] = 0;
+                        immunityGrid[i] = 50; 
+                    } else {
+                        nextGrid[i] = s; nextEnergy[i] = e - 10;
+                        if (nextEnergy[i] <= 0) { nextGrid[i] = 0; eventGrid[i] = 0; }
+                    }
+                    continue;
+                }
+
+                if (s === 1) { 
+                    nextEnergy[i] = Math.min(100, e + 2);
+                    if (n2 > 0 || n1 > 7) nextGrid[i] = 0; 
+                    else { nextGrid[i] = 1; if (Math.random() < 0.01) trySpawn(x, y, 1); }
+                } else if (s === 2) { 
+                    let newE = e - 2;
+                    if (n1 > 0) newE += 35;
+                    if (newE <= 0 || n3 > 0 || n2 > 6) nextGrid[i] = 0;
+                    else {
+                        nextGrid[i] = 2; nextEnergy[i] = Math.min(120, newE);
+                        if (newE > 60 && Math.random() < 0.08) trySpawn(x, y, 2);
+                    }
+                } else if (s === 3) { 
+                    let newE = e - 3;
+                    if (n2 > 0) newE += 65;
+                    if (newE <= 0 || n3 > 4) nextGrid[i] = 0;
+                    else {
+                        nextGrid[i] = 3; nextEnergy[i] = Math.min(150, newE);
+                        if (newE > 70 && Math.random() < 0.04) trySpawn(x, y, 3);
+                    }
+                } else { 
+                    if (Math.random() < 0.0004) { nextGrid[i] = 1; nextEnergy[i] = 50; }
+                }
+            }
+        }
+        [currentGrid, nextGrid] = [nextGrid, currentGrid];
+        [currentEnergy, nextEnergy] = [nextEnergy, currentEnergy];
+        generation++;
+    }
+
+    function trySpawn(x, y, species) {
+        const dx = (Math.random() < 0.5 ? -1 : 1), dy = (Math.random() < 0.5 ? -1 : 1);
+        const nx = (x + dx + COLS) % COLS, ny = (y + dy + ROWS) % ROWS;
+        const i = ny * COLS + nx;
+        if (nextGrid[i] === 0 && eventGrid[i] === 0) {
+            let spawnSpecies = species;
+            if (Math.random() < mutationChance) spawnSpecies = Math.floor(Math.random() * 3) + 1;
+            nextGrid[i] = spawnSpecies;
+            nextEnergy[i] = 60;
+        }
+    }
+
+    function draw() {
+        ctx.fillStyle = '#080808';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(panX, panY);
+        ctx.scale(zoom, zoom);
+
+        for (let i = 0; i < currentGrid.length; i++) {
+            const x = i % COLS, y = Math.floor(i / COLS);
+            const ev = eventGrid[i];
+            
+            // Draw Lava/Stone
+            if (ev > 0 && ev < 90) {
+                ctx.fillStyle = ev > 5 ? COLORS.lava : COLORS.stone;
+                ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
+
+            // Draw Living Cells
+            if (currentGrid[i] > 0) {
+                ctx.fillStyle = ev === 99 ? COLORS.virus : COLORS[currentGrid[i]];
+                ctx.globalAlpha = 0.4 + (currentEnergy[i] / 150);
+                ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 0.5, CELL_SIZE - 0.5);
+            }
+        }
+
+        // Draw Projectiles (Meteor animation)
+        for (let j = projectiles.length - 1; j >= 0; j--) {
+            const p = projectiles[j];
+            p.progress += p.speed;
+            const curX = p.startX + (p.targetX * CELL_SIZE - p.startX) * p.progress;
+            const curY = p.startY + (p.targetY * CELL_SIZE - p.startY) * p.progress;
+
+            // Trail
+            ctx.fillStyle = '#ffaa00';
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            ctx.arc(curX, curY, 15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Core
+            ctx.fillStyle = '#fff';
+            ctx.globalAlpha = 1;
+            ctx.fillRect(curX - 4, curY - 4, 8, 8);
+
+            if (p.progress >= 1) {
+                createExplosion(p.targetX, p.targetY);
+                projectiles.splice(j, 1);
+            }
+        }
+
+        ctx.restore();
+    }
+
+    function gameLoop(time) {
+        if (running) {
+            if (delay > 0) {
+                if (time - lastTick > delay) { simulate(); lastTick = time; }
+            } else {
+                for(let s=0; s < ticksPerFrame; s++) simulate();
+            }
+            if (generation % 10 === 0) updateStats();
+        }
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function handleWheel(e) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        const newZoom = Math.max(0.4, Math.min(zoom * delta, 20));
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        panX = mx - (mx - panX) * (newZoom / zoom);
+        panY = my - (my - panY) * (newZoom / zoom);
+        zoom = newZoom;
+    }
+
+    function updateSpeed(v) {
+        if (v <= 150) {
+            delay = Math.max(0, 150 - v);
+            document.getElementById('speed-display').textContent = (160-delay) + "hz";
+        } else {
+            delay = 0;
+            ticksPerFrame = Math.floor((v - 140) / 10);
+            document.getElementById('speed-display').textContent = ticksPerFrame + "x WARP";
+        }
+    }
+
+    function updateMutation(v) {
+        mutationChance = v / 100;
+        document.getElementById('mut-display').textContent = v + "%";
+    }
+
+    function toggleSimulation() {
+        running = !running;
+        document.getElementById('play-icon').textContent = running ? '⏸' : '▶';
+        document.getElementById('play-text').textContent = running ? 'Pause' : 'Start';
+        document.getElementById('play-btn').style.background = running ? '#f59e0b' : '#00ff88';
+    }
+
+    function stepOnce() { simulate(); draw(); }
+    function clearGrid() { 
+        currentGrid.fill(0); currentEnergy.fill(0); 
+        eventGrid.fill(0); immunityGrid.fill(0); projectiles = [];
+        generation = 0; updateStats(); 
+    }
+    
+    function updateStats() {
+        document.getElementById('gen-top').textContent = generation;
+        let c1=0, c2=0, c3=0;
+        for(let i=0; i<currentGrid.length; i++) {
+            const v = currentGrid[i];
+            if(v===1) c1++; else if(v===2) c2++; else if(v===3) c3++;
+        }
+        document.getElementById('stat-1').textContent = c1;
+        document.getElementById('stat-2').textContent = c2;
+        document.getElementById('stat-3').textContent = c3;
+    }
+
+    function randomize() {
+        for(let i=0; i<currentGrid.length; i++) {
+            const r = Math.random();
+            if(r > 0.99) { currentGrid[i]=3; currentEnergy[i]=100; }
+            else if(r > 0.96) { currentGrid[i]=2; currentEnergy[i]=80; }
+            else if(r > 0.90) { currentGrid[i]=1; currentEnergy[i]=100; }
+            else currentGrid[i]=0;
+            eventGrid[i] = 0; immunityGrid[i] = 0;
+        }
+        updateStats();
+    }
+
+    init();
+</script>
+</body>
+</html>
