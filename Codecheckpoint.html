@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CobiLife</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
+        :root { --neon: #00ff88; }
+        body { font-family: 'Space Grotesk', sans-serif; background: #050505; color: white; overflow: hidden; touch-action: none; }
+        canvas { image-rendering: pixelated; background-color: #080808; cursor: crosshair; outline: none; }
+        .glass { background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .active-tool { border-color: var(--neon) !important; box-shadow: 0 0 15px rgba(0, 255, 136, 0.5); background: rgba(0, 255, 136, 0.15) !important; }
+    </style>
+</head>
+<body class="h-screen flex flex-col md:flex-row">
+
+    <div class="w-full md:w-80 glass border-b md:border-r border-white/10 p-5 flex flex-col gap-4 z-20 overflow-y-auto">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold tracking-tighter text-[#00ff88]">COBILIFE</h1>
+            <span class="text-[10px] font-mono py-1 px-2 bg-white/5 rounded border border-white/10">GENETIC SIM</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+            <button onclick="toggleSimulation()" id="play-btn" class="py-3 rounded-xl bg-[#00ff88] text-black font-bold flex items-center justify-center gap-2 active:scale-95 transition-all">
+                <span id="play-icon">▶</span> <span id="play-text">Start</span>
+            </button>
+            <button onclick="stepOnce()" class="bg-white/5 hover:bg-white/10 rounded-xl text-xl">⏭</button>
+        </div>
+
+        <!-- God Tools -->
+        <div>
+            <h3 class="text-xs font-bold text-zinc-400 mb-2">GOD TOOLS</h3>
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="meteor()" class="p-3 bg-orange-950 hover:bg-orange-900 border border-orange-500/30 rounded-xl text-sm">☄️ Meteor</button>
+                <button onclick="virus()" class="p-3 bg-purple-950 hover:bg-purple-900 border border-purple-500/30 rounded-xl text-sm">🧪 Virus</button>
+                <button onclick="solarFlare()" class="p-3 bg-amber-950 hover:bg-amber-900 border border-amber-500/30 rounded-xl text-sm">☀️ Solar Flare</button>
+                <button onclick="seedBomb()" class="p-3 bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/30 rounded-xl text-sm">🌱 Seed Bomb</button>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <div>
+                <div class="flex justify-between text-xs text-zinc-400 mb-1">
+                    <span>Speed</span> <span id="speed-display" class="text-[#00ff88]">60 Hz</span>
+                </div>
+                <input type="range" id="speed-slider" min="1" max="200" value="80" class="w-full" oninput="updateSpeed(this.value)">
+            </div>
+
+            <div>
+                <div class="flex justify-between text-xs text-zinc-400 mb-1">
+                    <span>Mutation</span> <span id="mut-display" class="text-[#00ff88]">1%</span>
+                </div>
+                <input type="range" id="mut-slider" min="0" max="100" value="1" class="w-full" oninput="updateMutation(this.value)">
+            </div>
+        </div>
+
+        <hr class="border-white/10">
+
+        <div>
+            <h3 class="text-xs font-bold text-zinc-400 mb-2">BRUSH</h3>
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="setBrush(1)" id="b-1" class="p-3 bg-white/5 border border-transparent rounded-xl text-left">🌱 Plant</button>
+                <button onclick="setBrush(2)" id="b-2" class="p-3 bg-white/5 border border-transparent rounded-xl text-left active-tool">🐛 Prey</button>
+                <button onclick="setBrush(3)" id="b-3" class="p-3 bg-white/5 border border-transparent rounded-xl text-left">🦅 Predator</button>
+                <button onclick="setBrush(4)" id="b-4" class="p-3 bg-white/5 border border-transparent rounded-xl text-left">🏔️ Mountain</button>
+                <button onclick="setBrush(0)" id="b-0" class="p-3 bg-white/5 border border-transparent rounded-xl text-left">🧹 Eraser</button>
+            </div>
+        </div>
+
+        <div class="p-4 bg-black/40 rounded-2xl border border-white/5 font-mono text-sm space-y-1">
+            <div class="flex justify-between"><span>GEN</span><span id="gen-top" class="text-white">0</span></div>
+            <div class="flex justify-between"><span class="text-emerald-400">🌱 PLANTS</span><span id="stat-1" class="text-emerald-400">0</span></div>
+            <div class="flex justify-between"><span class="text-blue-400">🐛 PREY</span><span id="stat-2" class="text-blue-400">0</span></div>
+            <div class="flex justify-between"><span class="text-red-400">🦅 PREDATORS</span><span id="stat-3" class="text-red-400">0</span></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 mt-auto">
+            <button onclick="randomize()" class="py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium">🎲 Random</button>
+            <button onclick="clearGrid()" class="py-2 bg-zinc-800 hover:bg-red-900/30 rounded-xl text-sm font-medium">🗑️ Clear</button>
+        </div>
+
+        <button onclick="toggleHelp()" class="text-xs text-zinc-400 hover:text-white mt-2">How to Play →</button>
+    </div>
+
+    <div class="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+        <canvas id="canvas" tabindex="1"></canvas>
+    </div>
+
+    <!-- Help -->
+    <div id="help-overlay" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+        <div class="glass max-w-md p-8 rounded-3xl text-sm">
+            <h2 class="text-2xl text-[#00ff88] mb-4">Welcome to CobiLife</h2>
+            <p class="mb-4">This is now a <strong>closed ecosystem</strong>.</p>
+            <ul class="space-y-2 text-zinc-300">
+                <li>• Plants spread by seeds and need nutrients to grow</li>
+                <li>• Nutrients come from dead organisms (Circle of Life)</li>
+                <li>• Mountains are permanent barriers</li>
+                <li>• Use God Tools when everything dies</li>
+            </ul>
+            <button onclick="toggleHelp()" class="mt-6 w-full py-3 bg-white/10 hover:bg-white/20 rounded-2xl">Got it</button>
+        </div>
+    </div>
+
+<script>
+// =============== CORE ===============
+const COLS = 160, ROWS = 100, CELL_SIZE = 6;
+let gridA = new Int8Array(COLS * ROWS);
+let gridB = new Int8Array(COLS * ROWS);
+let energyA = new Int8Array(COLS * ROWS);
+let energyB = new Int8Array(COLS * ROWS);
+let nutrientA = new Uint8Array(COLS * ROWS);
+let nutrientB = new Uint8Array(COLS * ROWS);
+
+let currentGrid = gridA, nextGrid = gridB;
+let currentEnergy = energyA, nextEnergy = energyB;
+let currentNutrient = nutrientA, nextNutrient = nutrientB;
+
+let canvas, ctx;
+let running = false, generation = 0;
+let delay = 16, ticksPerFrame = 1;
+let mutationChance = 0.01;
+let currentBrush = 2;
+
+let zoom = 1, panX = 0, panY = 0;
+let isPanning = false, isDrawing = false;
+
+// =============== COLORS (Genetic Drift) ===============
+function getColor(s, energy) {
+    if (s === 4) return "#555555";
+    let hue = s === 1 ? 85 : s === 2 ? 210 : 15;
+    let sat = s === 1 ? 70 : s === 2 ? 90 : 95;
+    let lum = 35 + (energy / 3);
+    return `hsl(${hue}, ${sat}%, ${Math.min(85, lum)}%)`;
+}
+
+// =============== INIT ===============
+function init() {
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d', { alpha: false });
+    resize();
+    window.addEventListener('resize', resize);
+    setupControls();
+    updateSpeed(80);
+    randomize();
+    requestAnimationFrame(gameLoop);
+}
+
+function resize() {
+    canvas.width = canvas.parentNode.clientWidth;
+    canvas.height = canvas.parentNode.clientHeight;
+}
+
+function setupControls() {
+    // Mouse
+    canvas.addEventListener('mousedown', e => {
+        if (e.button === 0) isDrawing = true;
+        if (e.button === 1) isPanning = true;
+        paint(e);
+    });
+    window.addEventListener('mousemove', e => {
+        if (isPanning) {
+            panX += e.movementX;
+            panY += e.movementY;
+        }
+        if (isDrawing) paint(e);
+    });
+    window.addEventListener('mouseup', () => { isDrawing = false; isPanning = false; });
+
+    // Wheel zoom
+    canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        panX = mx - (mx - panX) * factor;
+        panY = my - (my - panY) * factor;
+        zoom *= factor;
+        zoom = Math.max(0.5, Math.min(zoom, 25));
+    });
+
+    // Touch support (basic)
+    canvas.addEventListener('touchstart', e => {
+        if (e.touches.length === 1) isDrawing = true;
+        paint(e.touches[0]);
+    });
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault();
+        if (isDrawing) paint(e.touches[0]);
+    });
+    canvas.addEventListener('touchend', () => isDrawing = false);
+}
+
+function paint(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor(((e.clientX - rect.left) - panX) / (zoom * CELL_SIZE));
+    const y = Math.floor(((e.clientY - rect.top) - panY) / (zoom * CELL_SIZE));
+
+    if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return;
+    const idx = y * COLS + x;
+
+    currentGrid[idx] = currentBrush;
+    if (currentBrush === 4) currentEnergy[idx] = 255;
+    else currentEnergy[idx] = currentBrush ? 80 : 0;
+}
+
+// =============== SIMULATION ===============
+function simulate() {
+    for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+            const i = y * COLS + x;
+            const s = currentGrid[i];
+            const e = currentEnergy[i];
+            const n = currentNutrient[i];
+
+            let np = 0, nprey = 0, npred = 0, nm = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+                    const nx = (x + dx + COLS) % COLS;
+                    const ny = (y + dy + ROWS) % ROWS;
+                    const type = currentGrid[ny * COLS + nx];
+                    if (type === 1) np++;
+                    else if (type === 2) nprey++;
+                    else if (type === 3) npred++;
+                    else if (type === 4) nm++;
+                }
+            }
+
+            if (s === 4) { // Mountain
+                nextGrid[i] = 4; nextEnergy[i] = 255; nextNutrient[i] = 0;
+                continue;
+            }
+
+            if (s === 1) { // Plant
+                nextEnergy[i] = Math.min(100, e + 3);
+                if (nprey > 1 || npred > 0) {
+                    nextGrid[i] = 0;
+                    nextNutrient[i] = Math.min(100, n + 30);
+                } else {
+                    nextGrid[i] = 1;
+                    nextNutrient[i] = Math.max(0, n - 1);
+                    if (Math.random() < 0.15) trySpawn(x, y, 1);
+                }
+            }
+            else if (s === 2) { // Prey
+                let newE = e - 4 + np * 9;
+                if (newE <= 0 || npred > 0) {
+                    nextGrid[i] = 0;
+                    nextNutrient[i] = Math.min(100, n + 45);
+                } else {
+                    nextGrid[i] = 2;
+                    nextEnergy[i] = Math.min(140, newE);
+                    nextNutrient[i] = n;
+                    if (newE > 65 && Math.random() < 0.08) trySpawn(x, y, 2);
+                }
+            }
+            else if (s === 3) { // Predator
+                let newE = e - 5 + nprey * 22;
+                if (newE <= 0) {
+                    nextGrid[i] = 0;
+                    nextNutrient[i] = Math.min(100, n + 60);
+                } else {
+                    nextGrid[i] = 3;
+                    nextEnergy[i] = Math.min(170, newE);
+                    nextNutrient[i] = n;
+                    if (newE > 90 && Math.random() < 0.05) trySpawn(x, y, 3);
+                }
+            }
+            else { // Empty
+                nextGrid[i] = 0;
+                nextEnergy[i] = 0;
+                if (n > 35 && Math.random() < 0.09) {
+                    nextGrid[i] = 1;
+                    nextEnergy[i] = 55;
+                    nextNutrient[i] = n - 28;
+                } else {
+                    nextNutrient[i] = Math.max(0, n - 2);
+                }
+            }
+        }
+    }
+
+    // Swap
+    [currentGrid, nextGrid] = [nextGrid, currentGrid];
+    [currentEnergy, nextEnergy] = [nextEnergy, currentEnergy];
+    [currentNutrient, nextNutrient] = [nextNutrient, currentNutrient];
+    generation++;
+}
+
+function trySpawn(x, y, type) {
+    const dx = Math.random() < 0.5 ? -1 : 1;
+    const dy = Math.random() < 0.5 ? -1 : 1;
+    const nx = (x + dx + COLS) % COLS;
+    const ny = (y + dy + ROWS) % ROWS;
+    const i = ny * COLS + nx;
+
+    if (nextGrid[i] === 0 && currentGrid[i] !== 4) {
+        let sp = type;
+        if (Math.random() < mutationChance) sp = Math.floor(Math.random() * 3) + 1;
+        nextGrid[i] = sp;
+        nextEnergy[i] = 65;
+    }
+}
+
+// =============== DRAW ===============
+function draw() {
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(panX, panY);
+    ctx.scale(zoom, zoom);
+
+    for (let i = 0; i < currentGrid.length; i++) {
+        const s = currentGrid[i];
+        if (s === 0) continue;
+        const x = i % COLS;
+        const y = Math.floor(i / COLS);
+        ctx.fillStyle = getColor(s, currentEnergy[i]);
+        ctx.globalAlpha = s === 4 ? 1 : 0.55 + currentEnergy[i] / 200;
+        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 0.6, CELL_SIZE - 0.6);
+    }
+    ctx.restore();
+}
+
+// =============== GOD TOOLS ===============
+function meteor() {
+    const cx = COLS/2 + (Math.random()-0.5)*50;
+    const cy = ROWS/2 + (Math.random()-0.5)*30;
+    for (let y = -15; y <= 15; y++) {
+        for (let x = -15; x <= 15; x++) {
+            if (x*x + y*y > 180) continue;
+            const idx = (Math.floor(cy+y) % ROWS) * COLS + (Math.floor(cx+x) % COLS);
+            currentGrid[idx] = 0;
+            currentEnergy[idx] = 0;
+            currentNutrient[idx] = 0;
+        }
+    }
+}
+
+function virus() {
+    for (let i = 0; i < currentGrid.length; i++) {
+        if (currentGrid[i] === 2 && Math.random() < 0.3) {
+            currentGrid[i] = 3;
+            currentEnergy[i] = 140;
+        }
+    }
+}
+
+function solarFlare() {
+    for (let i = 0; i < currentGrid.length; i++) {
+        if (currentGrid[i] === 1) currentEnergy[i] = 100;
+        if (currentGrid[i] === 3 && Math.random() < 0.65) currentEnergy[i] = Math.max(10, currentEnergy[i] - 60);
+    }
+}
+
+function seedBomb() {
+    const cx = Math.floor(Math.random() * (COLS-12)) + 6;
+    const cy = Math.floor(Math.random() * (ROWS-12)) + 6;
+    for (let y = -7; y <= 7; y++) {
+        for (let x = -7; x <= 7; x++) {
+            if (Math.random() > 0.35) continue;
+            const idx = ((cy + y + ROWS) % ROWS) * COLS + ((cx + x + COLS) % COLS);
+            if (currentGrid[idx] === 0) {
+                currentGrid[idx] = 1;
+                currentEnergy[idx] = 75;
+                currentNutrient[idx] = 70;
+            }
+        }
+    }
+}
+
+// =============== UI ===============
+function updateSpeed(v) {
+    delay = Math.max(0, 120 - v);
+    document.getElementById('speed-display').textContent = v > 100 ? (v-80)+"x" : Math.floor(1000/(delay||1)) + " Hz";
+}
+
+function updateMutation(v) {
+    mutationChance = v / 100;
+    document.getElementById('mut-display').textContent = v + "%";
+}
+
+function setBrush(b) {
+    currentBrush = b;
+    document.querySelectorAll('[id^="b-"]').forEach(el => el.classList.remove('active-tool'));
+    document.getElementById('b-' + b).classList.add('active-tool');
+}
+
+function toggleSimulation() {
+    running = !running;
+    const btn = document.getElementById('play-btn');
+    document.getElementById('play-icon').textContent = running ? '⏸' : '▶';
+    document.getElementById('play-text').textContent = running ? 'Pause' : 'Start';
+    btn.style.background = running ? '#f59e0b' : '#00ff88';
+}
+
+function stepOnce() { simulate(); draw(); updateStats(); }
+function clearGrid() {
+    currentGrid.fill(0); currentEnergy.fill(0); currentNutrient.fill(0);
+    generation = 0; updateStats();
+}
+
+function randomize() {
+    clearGrid();
+    for (let i = 0; i < currentGrid.length; i++) {
+        const r = Math.random();
+        if (r > 0.97) { currentGrid[i] = 3; currentEnergy[i] = 90; }
+        else if (r > 0.92) { currentGrid[i] = 2; currentEnergy[i] = 80; }
+        else if (r > 0.85) { currentGrid[i] = 1; currentEnergy[i] = 90; }
+        else if (r > 0.82) { currentGrid[i] = 4; currentEnergy[i] = 255; }
+    }
+    updateStats();
+}
+
+function updateStats() {
+    let p1=0, p2=0, p3=0;
+    for (let i = 0; i < currentGrid.length; i++) {
+        if (currentGrid[i] === 1) p1++;
+        else if (currentGrid[i] === 2) p2++;
+        else if (currentGrid[i] === 3) p3++;
+    }
+    document.getElementById('gen-top').textContent = generation;
+    document.getElementById('stat-1').textContent = p1;
+    document.getElementById('stat-2').textContent = p2;
+    document.getElementById('stat-3').textContent = p3;
+}
+
+function toggleHelp() {
+    document.getElementById('help-overlay').classList.toggle('hidden');
+}
+
+function gameLoop() {
+    if (running) {
+        if (delay > 0) {
+            if (Date.now() - (window.last || 0) > delay) {
+                simulate();
+                window.last = Date.now();
+            }
+        } else {
+            for (let i = 0; i < 3; i++) simulate();
+        }
+        if (generation % 6 === 0) updateStats();
+    }
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+init();
+</script>
+</body>
+</html>
